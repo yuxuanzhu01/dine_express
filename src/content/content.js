@@ -1,6 +1,7 @@
 /**
- * DineExpress - Google Maps Content Script (Compact Inline Edition)
- * Detects restaurant places and injects a sleek inline status badge and rich details popover.
+ * DineExpress - Google Maps Content Script (Clean Verified Edition)
+ * Only injects when an actual, verified official food safety report is matched.
+ * Suppresses any badges or placeholders if no official report is found.
  */
 
 (() => {
@@ -128,26 +129,11 @@
   }
 
   /**
-   * Render loading state
-   */
-  function renderLoading(wrapper) {
-    wrapper.innerHTML = `
-      <div class="dine-inline-bar">
-        <div class="dine-inline-loading">
-          <div class="dine-spinner-mini"></div>
-          <span>Checking Health Score...</span>
-        </div>
-      </div>
-    `;
-  }
-
-  /**
-   * Render compact inline badge and details popover
+   * Render verified inline badge and details popover
    */
   function renderBadge(wrapper, report) {
-    const isMatched = report.matched && report.latestInspection;
-    const placard = report.placard || { label: 'Inspected', badgeClass: 'neutral', icon: 'ℹ️' };
-    const badgeClass = placard.badgeClass || 'neutral';
+    const placard = report.placard || { label: 'Pass', badgeClass: 'pass', icon: '🟢' };
+    const badgeClass = placard.badgeClass || 'pass';
     const scoreText = report.score !== null ? ` ${report.score}` : '';
     const statusLabel = report.status || placard.label || 'Pass';
     const viewUrl = report.officialDatasetUrl || report.portalUrl || report.searchDeepLink || 'https://data.sfgov.org';
@@ -156,43 +142,40 @@
     let statusIcon = '🟢';
     if (badgeClass === 'conditional') statusIcon = '🟡';
     else if (badgeClass === 'closure') statusIcon = '🔴';
-    else if (badgeClass === 'neutral') statusIcon = '🏛️';
 
     // Build Detailed Violations HTML
     let violationsHtml = '';
-    if (isMatched && report.latestInspection) {
-      const viols = report.latestInspection.violations || [];
-      if (viols.length > 0) {
-        const violItems = viols.map(v => `
-          <div class="dine-violation-item">
-            <div class="dine-violation-top">
-              <span class="dine-viol-badge ${v.critical ? 'critical' : 'minor'}">${v.critical ? 'Critical' : 'Minor'} ${escapeHtml(v.code || '')}</span>
-              <span class="dine-viol-title">${escapeHtml(v.description || 'Violation recorded')}</span>
-            </div>
-            ${v.comment ? `<div class="dine-viol-desc">"${escapeHtml(v.comment.slice(0, 150))}${v.comment.length > 150 ? '...' : ''}"</div>` : ''}
+    const viols = report.latestInspection?.violations || [];
+    if (viols.length > 0) {
+      const violItems = viols.map(v => `
+        <div class="dine-violation-item">
+          <div class="dine-violation-top">
+            <span class="dine-viol-badge ${v.critical ? 'critical' : 'minor'}">${v.critical ? 'Critical' : 'Minor'} ${escapeHtml(v.code || '')}</span>
+            <span class="dine-viol-title">${escapeHtml(v.description || 'Violation recorded')}</span>
           </div>
-        `).join('');
+          ${v.comment ? `<div class="dine-viol-desc">"${escapeHtml(v.comment.slice(0, 150))}${v.comment.length > 150 ? '...' : ''}"</div>` : ''}
+        </div>
+      `).join('');
 
-        violationsHtml = `
-          <div class="dine-violations-box">
-            <div class="dine-violations-heading">
-              <span>⚠️ Observed Violations (${viols.length})</span>
-              <span style="font-size: 10px; color: ${report.latestInspection.criticalViolationsCount > 0 ? '#b91c1c' : '#047857'}">
-                ${report.latestInspection.criticalViolationsCount} Critical
-              </span>
-            </div>
-            ${violItems}
+      violationsHtml = `
+        <div class="dine-violations-box">
+          <div class="dine-violations-heading">
+            <span>⚠️ Observed Violations (${viols.length})</span>
+            <span style="font-size: 10px; color: ${report.latestInspection.criticalViolationsCount > 0 ? '#b91c1c' : '#047857'}">
+              ${report.latestInspection.criticalViolationsCount || 0} Critical
+            </span>
           </div>
-        `;
-      } else {
-        violationsHtml = `
-          <div class="dine-violations-box" style="background: #f0fdf4; border-color: #bbf7d0;">
-            <div style="color: #166534; font-weight: 600; font-size: 11px;">
-              ✅ Clean Inspection — Zero Violations Recorded
-            </div>
+          ${violItems}
+        </div>
+      `;
+    } else {
+      violationsHtml = `
+        <div class="dine-violations-box" style="background: #f0fdf4; border-color: #bbf7d0;">
+          <div style="color: #166534; font-weight: 600; font-size: 11px;">
+            ✅ Clean Inspection — Zero Violations Recorded
           </div>
-        `;
-      }
+        </div>
+      `;
     }
 
     // Build History HTML
@@ -218,14 +201,14 @@
         </span>
 
         <!-- More Details Trigger -->
-        <button class="dine-details-trigger" id="dineDetailsToggle" title="View details & portal link">
+        <button class="dine-details-trigger" id="dineDetailsToggle" title="View detailed violations & report">
           <span>Details</span>
           <span class="dine-chevron">▾</span>
         </button>
 
         <!-- Official Link -->
         <a href="${viewUrl}" target="_blank" rel="noopener noreferrer" class="dine-official-link" title="Open official health records">
-          ${isMatched ? 'Official Records ↗' : 'Search County Records ↗'}
+          Official Records ↗
         </a>
       </div>
 
@@ -238,13 +221,13 @@
               ${escapeHtml(report.businessName || '')} ${report.address ? `• ${escapeHtml(report.address)}` : ''}
             </div>
           </div>
-          <a href="${pdfUrl}" target="_blank" rel="noopener noreferrer" class="dine-pdf-btn" title="Open Official Health Inspection Portal">
-            ${isMatched ? '📄 Official PDF ↗' : '🏛️ Search Portal ↗'}
+          <a href="${pdfUrl}" target="_blank" rel="noopener noreferrer" class="dine-pdf-btn" title="View or Print Certified County Inspection Report / PDF">
+            📄 Official PDF ↗
           </a>
         </div>
 
         <div class="dine-popover-body">
-          ${isMatched && report.latestInspection ? `
+          ${report.latestInspection ? `
             <div class="dine-popover-row">
               <span class="dine-popover-label">Inspection Date:</span>
               <span class="dine-popover-val">${report.latestInspection.date}</span>
@@ -259,11 +242,7 @@
                 <span class="dine-popover-val"><strong>${report.score} / 100</strong></span>
               </div>
             ` : ''}
-          ` : `
-            <div style="color: #475569; font-size: 11.5px; line-height: 1.4; background: #f8fafc; padding: 8px 10px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 6px;">
-              <strong>${escapeHtml(report.countyName)}</strong> maintains restaurant inspection records on its official environmental health portal. Click <strong>"Search Portal ↗"</strong> to look up certified inspection reports for this establishment.
-            </div>
-          `}
+          ` : ''}
 
           <!-- Violations Breakdown -->
           ${violationsHtml}
@@ -311,34 +290,7 @@
   }
 
   /**
-   * Load health data for place
-   */
-  function loadHealthData(placeInfo) {
-    if (!currentWrapper) return;
-    renderLoading(currentWrapper);
-
-    chrome.runtime.sendMessage(
-      {
-        type: 'SEARCH_HEALTH_REPORT',
-        payload: {
-          restaurantName: placeInfo.name,
-          address: placeInfo.address,
-          bypassCache: false
-        }
-      },
-      (response) => {
-        if (!response || !response.success || !response.data) {
-          if (currentWrapper) currentWrapper.remove();
-          return;
-        }
-
-        renderBadge(currentWrapper, response.data);
-      }
-    );
-  }
-
-  /**
-   * Check page and inject inline badge if restaurant
+   * Check page and only inject if an actual official record is verified
    */
   function checkAndInject() {
     const place = extractPlaceInfo();
@@ -366,28 +318,56 @@
 
     currentPlaceId = place.id;
 
+    // Clean up old badge
     const existing = document.querySelector('.dine-inline-wrapper');
     if (existing) {
       existing.remove();
     }
 
-    const anchor = findAnchor();
-    if (!anchor || !anchor.parent) {
-      return;
-    }
+    // Query in background FIRST before inserting any DOM elements
+    chrome.runtime.sendMessage(
+      {
+        type: 'SEARCH_HEALTH_REPORT',
+        payload: {
+          restaurantName: place.name,
+          address: place.address,
+          bypassCache: false
+        }
+      },
+      (response) => {
+        // STRICT RULE: If no verified record exists, do NOT show anything!
+        if (!response || !response.success || !response.data || !response.data.matched || !response.data.latestInspection) {
+          if (currentWrapper) {
+            currentWrapper.remove();
+            currentWrapper = null;
+          }
+          return;
+        }
 
-    const wrapper = document.createElement('div');
-    wrapper.className = 'dine-inline-wrapper';
-    wrapper.setAttribute('data-dine-place', place.id);
+        // Verify place has not changed while network request was pending
+        if (currentPlaceId !== place.id) {
+          return;
+        }
 
-    if (anchor.before) {
-      anchor.parent.insertBefore(wrapper, anchor.before);
-    } else {
-      anchor.parent.appendChild(wrapper);
-    }
+        const anchor = findAnchor();
+        if (!anchor || !anchor.parent) {
+          return;
+        }
 
-    currentWrapper = wrapper;
-    loadHealthData(place);
+        const wrapper = document.createElement('div');
+        wrapper.className = 'dine-inline-wrapper';
+        wrapper.setAttribute('data-dine-place', place.id);
+
+        if (anchor.before) {
+          anchor.parent.insertBefore(wrapper, anchor.before);
+        } else {
+          anchor.parent.appendChild(wrapper);
+        }
+
+        currentWrapper = wrapper;
+        renderBadge(wrapper, response.data);
+      }
+    );
   }
 
   function startObserver() {
@@ -405,7 +385,7 @@
     window.addEventListener('popstate', checkAndInject);
     window.addEventListener('hashchange', checkAndInject);
 
-    setTimeout(checkAndInject, 600);
+    setTimeout(checkAndInject, 500);
     setTimeout(checkAndInject, 1500);
   }
 
