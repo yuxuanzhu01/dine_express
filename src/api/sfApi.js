@@ -66,8 +66,7 @@ export function getSFPlacardInfo(statusStr, scoreNum) {
 
 export async function querySanFranciscoCounty(restaurantName, address = '') {
   try {
-    const { primaryName, cleanTokens } = normalizeRestaurantName(restaurantName);
-    const searchToken = cleanTokens[0] || primaryName;
+    const { primaryName, cleanTokens, searchToken } = normalizeRestaurantName(restaurantName);
     const addrNorm = normalizeAddress(address);
 
     let records = [];
@@ -135,13 +134,16 @@ export async function querySanFranciscoCounty(restaurantName, address = '') {
     const violationCount = latest.violation_count ? Number(latest.violation_count) : 0;
     const placard = getSFPlacardInfo(status, null);
 
+    // Parse violation codes into structured objects
     const rawViolations = latest.violation_codes ? latest.violation_codes.split(', ') : [];
     const violations = rawViolations.map(codeStr => {
       const isCritical = /113952|113953|113996|114259|temperature|hands|vermin|rodent/i.test(codeStr);
+      const parts = codeStr.split(' - ');
       return {
-        description: codeStr,
+        code: parts[0] || '',
+        description: parts[1] || codeStr,
         critical: isCritical,
-        code: codeStr.split(' - ')[0] || ''
+        comment: parts[1] || codeStr
       };
     });
 
@@ -187,7 +189,8 @@ export async function querySanFranciscoCounty(restaurantName, address = '') {
       },
       history,
       portalUrl: officialUrl,
-      officialDatasetUrl: officialUrl
+      officialDatasetUrl: officialUrl,
+      reportPdfUrl: officialUrl
     };
   } catch (error) {
     console.error('DineExpress: SF Query failed', error);
@@ -197,8 +200,7 @@ export async function querySanFranciscoCounty(restaurantName, address = '') {
 
 async function querySFHistorical(restaurantName, address) {
   try {
-    const { primaryName, cleanTokens } = normalizeRestaurantName(restaurantName);
-    const searchToken = cleanTokens[0] || primaryName;
+    const { primaryName, cleanTokens, searchToken } = normalizeRestaurantName(restaurantName);
     const addrNorm = normalizeAddress(address);
 
     let records = [];
@@ -252,7 +254,8 @@ async function querySFHistorical(restaurantName, address) {
         violations: records.filter(r => r.violation_description).map(r => ({
           description: r.violation_description,
           critical: (r.risk_category || '').toLowerCase().includes('high'),
-          code: r.violation_id || ''
+          code: r.violation_id || '',
+          comment: r.violation_description || ''
         }))
       },
       history: records.map(r => ({
@@ -265,7 +268,8 @@ async function querySFHistorical(restaurantName, address) {
         comment: r.violation_description || ''
       })),
       portalUrl: officialUrl,
-      officialDatasetUrl: officialUrl
+      officialDatasetUrl: officialUrl,
+      reportPdfUrl: officialUrl
     };
   } catch (err) {
     return null;

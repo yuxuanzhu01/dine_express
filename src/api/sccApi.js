@@ -78,18 +78,16 @@ export function getSCCPlacardInfo(resultCode, scoreNum) {
 }
 
 /**
- * Query Santa Clara County with Address-First strategy
+ * Query Santa Clara County with Address-First strategy and deep violation breakdown
  */
 export async function querySantaClaraCounty(restaurantName, address = '') {
   try {
-    const { primaryName, cleanTokens } = normalizeRestaurantName(restaurantName);
-    const searchToken = cleanTokens[0] || primaryName;
+    const { primaryName, cleanTokens, searchToken } = normalizeRestaurantName(restaurantName);
     const addrNorm = normalizeAddress(address);
 
     let businesses = [];
 
-    // Step 1: Address-First Query (Match exact physical location first)
-    // Ensures multi-location branches and restaurants with different legal DBA names match precisely.
+    // Step 1: Address-First Query
     if (addrNorm.streetNumber && addrNorm.streetWord) {
       const whereAddr = encodeURIComponent(`upper(address) like upper('%${addrNorm.streetNumber}%${addrNorm.streetWord}%')`);
       const bizUrl = `${SCC_BASE_URL}/${BIZ_DATASET}?$where=${whereAddr}&$limit=10`;
@@ -102,7 +100,7 @@ export async function querySantaClaraCounty(restaurantName, address = '') {
       }
     }
 
-    // Step 2: Name Query (Fallback if address query returned no candidates)
+    // Step 2: Name Query Fallback
     if (businesses.length === 0 && searchToken) {
       const whereName = encodeURIComponent(`upper(name) like upper('%${searchToken}%')`);
       const bizUrl = `${SCC_BASE_URL}/${BIZ_DATASET}?$where=${whereName}&$limit=15`;
@@ -119,7 +117,7 @@ export async function querySantaClaraCounty(restaurantName, address = '') {
       return null;
     }
 
-    // Step 3: Rank candidates with location priority
+    // Step 3: Rank candidates
     const candidates = businesses.map(biz => ({
       biz,
       score: calculateMatchScore(
@@ -138,21 +136,19 @@ export async function querySantaClaraCounty(restaurantName, address = '') {
     const matchedBiz = bestMatch.biz;
     const businessId = matchedBiz.business_id;
 
-    // LEGAL SAFEGUARD: If the candidate has a low match score or address mismatch,
-    // do not project a negative placard onto the business.
+    // LEGAL SAFEGUARD: If negative candidate has address mismatch, suppress match
     const targetAddr = normalizeAddress(address);
     const candAddr = normalizeAddress(matchedBiz.address);
     const hasAddressMismatch = targetAddr.streetNumber && candAddr.streetNumber && targetAddr.streetNumber !== candAddr.streetNumber;
 
     if (hasAddressMismatch && bestMatch.score < 70) {
-      // Reject match to prevent false negative attribution
       return null;
     }
 
     // Official detail link: https://eservices.sccgov.org/FacilityInspection/Home/ShowDetail/PRxxxxxxx
     const officialDetailUrl = `https://eservices.sccgov.org/FacilityInspection/Home/ShowDetail/${businessId}`;
 
-    // Step 4: Query inspections for this business_id
+    // Step 4: Fetch inspection history
     const inspWhere = encodeURIComponent(`business_id='${businessId}'`);
     const inspUrl = `${SCC_BASE_URL}/${INSP_DATASET}?$where=${inspWhere}&$order=date%20DESC&$limit=10`;
     const inspRes = await fetch(inspUrl);
@@ -182,12 +178,12 @@ export async function querySantaClaraCounty(restaurantName, address = '') {
     const scoreNum = latest.score ? Number(latest.score) : null;
     const placard = getSCCPlacardInfo(latest.result, scoreNum);
 
-    // Step 5: Query violations for latest inspection
+    // Step 5: Query detailed violations for latest inspections
     let violations = [];
     if (latestInspId) {
       try {
         const violWhere = encodeURIComponent(`inspection_id='${latestInspId}'`);
-        const violUrl = `${SCC_BASE_URL}/${VIOL_DATASET}?$where=${violWhere}&$limit=20`;
+        const violUrl = `${SCC_BASE_URL}/${VIOL_DATASET}?$where=${violWhere}&$limit=25`;
         const violRes = await fetch(violUrl);
         if (violRes.ok) {
           violations = await violRes.json();
@@ -197,7 +193,29 @@ export async function querySantaClaraCounty(restaurantName, address = '') {
       }
     }
 
+    // If latest was clean follow-up, also fetch violations from recent routine inspection for context
+    let priorViolations = [];
+    if (violations.length === 0 && inspections.length > 1) {
+      const routineInsp = inspections.find(i => (i.type || '').toUpperCase().includes('ROUTINE') && (i.inpsection_id || i.inspection_id) !== latestInspId);
+      if (routineInsp) {
+        const rId = routineInsp.inpsection_id || routineInsp.inspection_id;
+        try {
+          const violRes = await fetch(`${SCC_BASE_URL}/${VIOL_DATASET}?$where=${encodeURIComponent(`inspection_id='${rId}'`)}&$limit=15`);
+          if (violRes.ok) {
+            priorViolations = await violRes.json();
+          }
+        } catch (e) {}
+      }
+    }
+
     const criticalViolations = violations.filter(v => v.critical === true || v.critical === 'true');
+
+    const formattedViolations = violations.map(v => ({
+      code: v.code || '',
+      description: v.description || 'Violation recorded',
+      critical: v.critical === true || v.critical === 'true',
+      comment: v.violation_comment || ''
+    }));
 
     const history = inspections.map(insp => {
       const sNum = insp.score ? Number(insp.score) : null;
@@ -234,16 +252,13 @@ export async function querySantaClaraCounty(restaurantName, address = '') {
         comment: latest.inspection_comment || '',
         violationsCount: violations.length,
         criticalViolationsCount: criticalViolations.length,
-        violations: violations.map(v => ({
-          code: v.code,
-          description: v.description,
-          critical: v.critical === true || v.critical === 'true',
-          comment: v.violation_comment
-        }))
+        violations: formattedViolations,
+        priorResolvedViolationsCount: priorViolations.length
       },
       history,
       portalUrl: officialDetailUrl,
-      officialDatasetUrl: officialDetailUrl
+      officialDatasetUrl: officialDetailUrl,
+      reportPdfUrl: officialDetailUrl
     };
   } catch (error) {
     console.error('DineExpress: SCC Query failed', error);

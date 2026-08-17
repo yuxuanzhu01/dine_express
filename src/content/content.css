@@ -122,20 +122,20 @@
   text-decoration: underline;
 }
 
-/* Compact Popover Dropdown */
+/* Rich Details Popover */
 .dine-popover {
   display: none;
   position: relative;
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  padding: 12px;
-  margin-top: 6px;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.12), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
+  padding: 14px;
+  margin-top: 8px;
   width: 100%;
-  max-width: 360px;
+  max-width: 380px;
   font-size: 12px;
-  animation: dineFadeIn 0.15s ease-out;
+  animation: dineFadeIn 0.18s ease-out;
 }
 
 .dine-popover.open {
@@ -151,37 +151,51 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-bottom: 6px;
-  margin-bottom: 8px;
+  padding-bottom: 8px;
+  margin-bottom: 10px;
   border-bottom: 1px solid #f1f5f9;
 }
 
 .dine-popover-county {
   font-weight: 700;
-  color: #334155;
+  color: #1e293b;
+  font-size: 13px;
 }
 
-.dine-popover-date {
-  color: #64748b;
+.dine-pdf-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+  padding: 4px 8px;
+  border-radius: 6px;
   font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.dine-pdf-btn:hover {
+  background: #dcfce7;
+  border-color: #86efac;
 }
 
 .dine-popover-body {
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .dine-popover-row {
   display: flex;
   justify-content: space-between;
   margin-bottom: 4px;
-}
-
-.dine-popover-row:last-child {
-  margin-bottom: 0;
+  font-size: 11.5px;
 }
 
 .dine-popover-label {
   color: #64748b;
+  font-weight: 500;
 }
 
 .dine-popover-val {
@@ -189,11 +203,84 @@
   color: #0f172a;
 }
 
+/* Violation Breakdown Cards */
+.dine-violations-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 8px 0;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.dine-violations-heading {
+  font-size: 11px;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dine-violation-item {
+  padding: 6px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.dine-violation-item:last-child {
+  border-bottom: none;
+}
+
+.dine-violation-top {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.dine-viol-badge {
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.dine-viol-badge.critical {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.dine-viol-badge.minor {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.dine-viol-title {
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.dine-viol-desc {
+  font-size: 10.5px;
+  color: #64748b;
+  line-height: 1.35;
+  margin-top: 2px;
+  padding-left: 2px;
+}
+
+/* Historical Timeline */
 .dine-popover-history {
   margin-top: 8px;
   padding-top: 8px;
   border-top: 1px solid #f1f5f9;
-  max-height: 130px;
+  max-height: 120px;
   overflow-y: auto;
 }
 
@@ -218,12 +305,12 @@
 
 /* Legal Notice */
 .dine-popover-legal {
-  margin-top: 8px;
+  margin-top: 10px;
   padding-top: 6px;
   border-top: 1px solid #f1f5f9;
-  font-size: 10px;
+  font-size: 9.5px;
   color: #94a3b8;
-  line-height: 1.3;
+  line-height: 1.35;
 }
 
 /* Loading skeleton */

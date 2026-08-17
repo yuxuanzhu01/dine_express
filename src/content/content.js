@@ -1,6 +1,6 @@
 /**
  * DineExpress - Google Maps Content Script (Compact Inline Edition)
- * Detects restaurant places and injects a sleek inline status badge and details popover.
+ * Detects restaurant places and injects a sleek inline status badge and rich details popover.
  */
 
 (() => {
@@ -151,18 +151,59 @@
     const scoreText = report.score !== null ? ` ${report.score}` : '';
     const statusLabel = report.status || placard.label || 'Pass';
     const viewUrl = report.officialDatasetUrl || report.portalUrl || report.searchDeepLink || 'https://data.sfgov.org';
+    const pdfUrl = report.reportPdfUrl || viewUrl;
 
     let statusIcon = '🟢';
     if (badgeClass === 'conditional') statusIcon = '🟡';
     else if (badgeClass === 'closure') statusIcon = '🔴';
     else if (badgeClass === 'neutral') statusIcon = '🏛️';
 
+    // Build Detailed Violations HTML
+    let violationsHtml = '';
+    if (isMatched && report.latestInspection) {
+      const viols = report.latestInspection.violations || [];
+      if (viols.length > 0) {
+        const violItems = viols.map(v => `
+          <div class="dine-violation-item">
+            <div class="dine-violation-top">
+              <span class="dine-viol-badge ${v.critical ? 'critical' : 'minor'}">${v.critical ? 'Critical' : 'Minor'} ${escapeHtml(v.code || '')}</span>
+              <span class="dine-viol-title">${escapeHtml(v.description || 'Violation recorded')}</span>
+            </div>
+            ${v.comment ? `<div class="dine-viol-desc">"${escapeHtml(v.comment.slice(0, 150))}${v.comment.length > 150 ? '...' : ''}"</div>` : ''}
+          </div>
+        `).join('');
+
+        violationsHtml = `
+          <div class="dine-violations-box">
+            <div class="dine-violations-heading">
+              <span>⚠️ Observed Violations (${viols.length})</span>
+              <span style="font-size: 10px; color: ${report.latestInspection.criticalViolationsCount > 0 ? '#b91c1c' : '#047857'}">
+                ${report.latestInspection.criticalViolationsCount} Critical
+              </span>
+            </div>
+            ${violItems}
+          </div>
+        `;
+      } else {
+        violationsHtml = `
+          <div class="dine-violations-box" style="background: #f0fdf4; border-color: #bbf7d0;">
+            <div style="color: #166534; font-weight: 600; font-size: 11px;">
+              ✅ Clean Inspection — Zero Violations Recorded
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    // Build History HTML
     let historyListHtml = '';
     if (report.history && report.history.length > 0) {
       historyListHtml = report.history.slice(0, 5).map(h => `
         <div class="dine-popover-history-item">
           <span>${h.date}</span>
-          <span style="font-weight: 600;">${h.score ? `Score: ${h.score}` : (h.status || 'Inspected')}</span>
+          <span style="font-weight: 600; color: ${h.badgeClass === 'closure' ? '#b91c1c' : (h.badgeClass === 'conditional' ? '#b45309' : '#047857')};">
+            ${h.score ? `Score: ${h.score}` : (h.status || 'Inspected')}
+          </span>
         </div>
       `).join('');
     }
@@ -177,7 +218,7 @@
         </span>
 
         <!-- More Details Trigger -->
-        <button class="dine-details-trigger" id="dineDetailsToggle" title="View inspection details">
+        <button class="dine-details-trigger" id="dineDetailsToggle" title="View detailed violations & report">
           <span>Details</span>
           <span class="dine-chevron">▾</span>
         </button>
@@ -188,29 +229,34 @@
         </a>
       </div>
 
-      <!-- Popover Drawer -->
+      <!-- Rich Details Popover -->
       <div class="dine-popover" id="dinePopover">
         <div class="dine-popover-header">
-          <span class="dine-popover-county">🏛️ ${escapeHtml(report.countyName)}</span>
-          <span class="dine-popover-date">${isMatched ? `Latest: ${report.latestInspection.date}` : 'Health Portal'}</span>
+          <div>
+            <div class="dine-popover-county">🏛️ ${escapeHtml(report.countyName)}</div>
+            <div style="font-size: 10.5px; color: #64748b; margin-top: 1px;">
+              ${escapeHtml(report.businessName || '')} ${report.address ? `• ${escapeHtml(report.address)}` : ''}
+            </div>
+          </div>
+          <a href="${pdfUrl}" target="_blank" rel="noopener noreferrer" class="dine-pdf-btn" title="View or Print Certified County Inspection Report / PDF">
+            📄 Official PDF ↗
+          </a>
         </div>
 
         <div class="dine-popover-body">
           ${isMatched && report.latestInspection ? `
             <div class="dine-popover-row">
+              <span class="dine-popover-label">Inspection Date:</span>
+              <span class="dine-popover-val">${report.latestInspection.date}</span>
+            </div>
+            <div class="dine-popover-row">
               <span class="dine-popover-label">Inspection Type:</span>
               <span class="dine-popover-val">${escapeHtml(report.latestInspection.type)}</span>
             </div>
-            <div class="dine-popover-row">
-              <span class="dine-popover-label">Violations:</span>
-              <span class="dine-popover-val" style="color: ${report.latestInspection.criticalViolationsCount > 0 ? '#dc2626' : '#059669'}">
-                ${report.latestInspection.criticalViolationsCount > 0 ? `⚠️ ${report.latestInspection.criticalViolationsCount} Critical` : '✅ 0 Critical'}
-                ${report.latestInspection.violationsCount > 0 ? ` (${report.latestInspection.violationsCount} total)` : ''}
-              </span>
-            </div>
-            ${report.latestInspection.comment ? `
-              <div style="font-size: 11px; color: #64748b; font-style: italic; margin-top: 6px; line-height: 1.3;">
-                "${escapeHtml(report.latestInspection.comment.slice(0, 140))}${report.latestInspection.comment.length > 140 ? '...' : ''}"
+            ${report.score !== null ? `
+              <div class="dine-popover-row">
+                <span class="dine-popover-label">Compliance Score:</span>
+                <span class="dine-popover-val"><strong>${report.score} / 100</strong></span>
               </div>
             ` : ''}
           ` : `
@@ -218,8 +264,12 @@
               Inspection records are maintained by the ${escapeHtml(report.countyName)} Environmental Health department.
             </div>
           `}
+
+          <!-- Violations Breakdown -->
+          ${violationsHtml}
         </div>
 
+        <!-- History Timeline -->
         ${historyListHtml ? `
           <div class="dine-popover-history">
             <div class="dine-history-title">📜 Past Inspections</div>
