@@ -122,10 +122,10 @@ export const BAY_AREA_COUNTIES = {
     name: 'Solano County',
     shortName: 'Solano',
     hasDirectApi: false,
-    portalName: 'Solano County Environmental Health',
-    portalUrl: 'https://www.solanocounty.com/depts/rm/environmental_health/food/default.asp',
-    datasetUrl: 'https://www.solanocounty.com/',
-    searchUrlBuilder: (query) => `https://www.solanocounty.com/depts/rm/environmental_health/food/default.asp`,
+    portalName: 'Solano County Environmental Health Accela Portal',
+    portalUrl: 'https://aca-prod.accela.com/SOLANO/Cap/CapHome.aspx?module=EnvHealth',
+    datasetUrl: 'https://aca-prod.accela.com/SOLANO/Cap/CapHome.aspx?module=EnvHealth',
+    searchUrlBuilder: (query) => `https://aca-prod.accela.com/SOLANO/Cap/CapHome.aspx?module=EnvHealth`,
     cities: [
       'vallejo', 'fairfield', 'vacaville', 'suisun city', 'benicia', 'dixon', 'rio vista'
     ],

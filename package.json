@@ -6,6 +6,8 @@
   "type": "module",
   "scripts": {
     "test": "node test/test_queries.js",
+    "test:all": "node test/test_all_9_counties.js",
+    "test:address": "node test/test_address_first.js",
     "generate-icons": "node scripts/generate_icons.js"
   },
   "keywords": [
