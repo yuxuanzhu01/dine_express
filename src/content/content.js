@@ -227,9 +227,17 @@
           </div>
         ` : ''}
 
-        <!-- Legal Disclaimer & Liability Waiver Note -->
+        <!-- Legal Disclaimer & Discrepancy Reporting -->
         <div class="dine-popover-legal">
-          ⚖️ <em>Informational public data aggregate. Official county records govern. Provided AS IS without warranty.</em>
+          <div>⚖️ <em>Informational public data aggregate. Official county records govern. Provided AS IS.</em></div>
+          <div style="margin-top: 4px; display: flex; justify-content: space-between; align-items: center;">
+            <a href="https://github.com/yuxuanzhu0214/dine_express/issues/new?title=Data+Mismatch+Report:+${encodeURIComponent(report.businessName || '')}" target="_blank" rel="noopener noreferrer" style="color: #64748b; text-decoration: underline; font-size: 9px;">
+              🚩 Flag Discrepancy / Report Mismatch
+            </a>
+            <a href="https://github.com/yuxuanzhu0214/dine_express/blob/main/DISCLAIMER.md" target="_blank" rel="noopener noreferrer" style="color: #64748b; text-decoration: underline; font-size: 9px;">
+              Legal Terms ↗
+            </a>
+          </div>
         </div>
       </div>
     `;

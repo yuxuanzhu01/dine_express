@@ -138,6 +138,17 @@ export async function querySantaClaraCounty(restaurantName, address = '') {
     const matchedBiz = bestMatch.biz;
     const businessId = matchedBiz.business_id;
 
+    // LEGAL SAFEGUARD: If the candidate has a low match score or address mismatch,
+    // do not project a negative placard onto the business.
+    const targetAddr = normalizeAddress(address);
+    const candAddr = normalizeAddress(matchedBiz.address);
+    const hasAddressMismatch = targetAddr.streetNumber && candAddr.streetNumber && targetAddr.streetNumber !== candAddr.streetNumber;
+
+    if (hasAddressMismatch && bestMatch.score < 70) {
+      // Reject match to prevent false negative attribution
+      return null;
+    }
+
     // Official detail link: https://eservices.sccgov.org/FacilityInspection/Home/ShowDetail/PRxxxxxxx
     const officialDetailUrl = `https://eservices.sccgov.org/FacilityInspection/Home/ShowDetail/${businessId}`;
 
