@@ -6,10 +6,10 @@
 /**
  * Extracts primary name components, stripping non-Latin secondary scripts, branch numbers, and punctuation.
  * @param {string} rawName
- * @returns {{ primaryName: string, cleanTokens: string[], rawClean: string }}
+ * @returns {{ primaryName: string, cleanTokens: string[], searchToken: string, rawClean: string }}
  */
 export function normalizeRestaurantName(rawName) {
-  if (!rawName) return { primaryName: '', cleanTokens: [], rawClean: '' };
+  if (!rawName) return { primaryName: '', cleanTokens: [], searchToken: '', rawClean: '' };
 
   let name = rawName.trim();
 
@@ -26,19 +26,32 @@ export function normalizeRestaurantName(rawName) {
   name = name.replace(/\s*#\d+/g, '');
   name = name.replace(/\s*-\s*[0-9]+[a-zA-Z\s]+$/g, '');
 
-  // 4. Clean special characters but preserve apostrophes and hyphens
+  // 4. Preserve hyphenated phrases like In-N-Out
   const rawClean = name.replace(/[^\w\s'&]/gi, ' ').replace(/\s+/g, ' ').trim();
 
   // 5. Build clean comparison tokens
   const stopWords = new Set(['the', 'and', 'llc', 'inc', 'corp', 'co', 'dba', 'restaurant', 'cafe', 'bistro', 'kitchen', 'express', 'food', 'foods']);
-  const tokens = rawClean
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(t => t.length > 0 && !stopWords.has(t));
+  
+  // Split tokens preserving words
+  const words = rawClean.split(/\s+/).filter(Boolean);
+  const significantTokens = words.filter(w => !stopWords.has(w.toLowerCase()) && w.length >= 3);
+
+  // Pick the best search token (prefer longer significant words)
+  let searchToken = '';
+  if (/in[\s\-]+n[\s\-]+out/i.test(name)) {
+    searchToken = 'IN-N-OUT';
+  } else if (significantTokens.length > 0) {
+    // Sort by length descending to pick most specific token (e.g. "Marufuku", "Tartine", "Fashion", "Tung")
+    const sorted = [...significantTokens].sort((a, b) => b.length - a.length);
+    searchToken = sorted[0];
+  } else {
+    searchToken = words[0] || rawClean;
+  }
 
   return {
     primaryName: name,
-    cleanTokens: tokens.length > 0 ? tokens : rawClean.toLowerCase().split(/\s+/).filter(Boolean),
+    cleanTokens: significantTokens.length > 0 ? significantTokens : words,
+    searchToken,
     rawClean: rawClean
   };
 }
@@ -71,13 +84,13 @@ export function normalizeAddress(rawAddress) {
   const streetPart = parts[0] ? parts[0].replace(/^\d+\s+/, '') : '';
   const cityPart = parts[1] || '';
 
-  // Get primary street token (e.g. "Murphy" from "S Murphy Ave", "Guerrero" from "Guerrero St", "Halford" from "Halford Ave")
+  // Get primary street token (excluding directions and suffixes)
   const streetTokens = streetPart
     .toLowerCase()
     .replace(/\b(avenue|ave|street|st|boulevard|blvd|drive|dr|road|rd|way|hwy|pkwy|ln|ct|n|s|e|w|north|south|east|west)\b/gi, '')
     .trim()
     .split(/\s+/)
-    .filter(Boolean);
+    .filter(t => t.length >= 2);
 
   const streetWord = streetTokens[0] || '';
 
@@ -144,6 +157,10 @@ export function calculateMatchScore(target, candidate) {
         }
       }
     }
+
+    if (targetAddr.city && candAddr.rawClean.toLowerCase().includes(targetAddr.city)) {
+      score += 15; // City match bonus
+    }
   }
 
   // 2. Name Match Scoring
@@ -157,7 +174,7 @@ export function calculateMatchScore(target, candidate) {
     const tLow = targetNameNorm.rawClean.toLowerCase();
     const cLow = candNameNorm.rawClean.toLowerCase();
     if (cLow.includes(tLow) || tLow.includes(cLow)) {
-      score += 15;
+      score += 20;
     }
   }
 

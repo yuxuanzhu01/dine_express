@@ -77,6 +77,9 @@ export function getSCCPlacardInfo(resultCode, scoreNum) {
   };
 }
 
+/**
+ * Query Santa Clara County with Address-First strategy
+ */
 export async function querySantaClaraCounty(restaurantName, address = '') {
   try {
     const { primaryName, cleanTokens } = normalizeRestaurantName(restaurantName);
@@ -85,25 +88,30 @@ export async function querySantaClaraCounty(restaurantName, address = '') {
 
     let businesses = [];
 
-    // Pass 1: Search by Name
-    if (searchToken) {
-      const whereClause = encodeURIComponent(`upper(name) like upper('%${searchToken}%')`);
-      const bizUrl = `${SCC_BASE_URL}/${BIZ_DATASET}?$where=${whereClause}&$limit=15`;
-      const res = await fetch(bizUrl);
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) businesses = data;
-      }
-    }
-
-    // Pass 2: If no businesses found by name, search by Street Number + Street Word
-    if (businesses.length === 0 && addrNorm.streetNumber && addrNorm.streetWord) {
+    // Step 1: Address-First Query (Match exact physical location first)
+    // Ensures multi-location branches and restaurants with different legal DBA names match precisely.
+    if (addrNorm.streetNumber && addrNorm.streetWord) {
       const whereAddr = encodeURIComponent(`upper(address) like upper('%${addrNorm.streetNumber}%${addrNorm.streetWord}%')`);
       const bizUrl = `${SCC_BASE_URL}/${BIZ_DATASET}?$where=${whereAddr}&$limit=10`;
       const res = await fetch(bizUrl);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data)) businesses = data;
+        if (Array.isArray(data) && data.length > 0) {
+          businesses = data;
+        }
+      }
+    }
+
+    // Step 2: Name Query (Fallback if address query returned no candidates)
+    if (businesses.length === 0 && searchToken) {
+      const whereName = encodeURIComponent(`upper(name) like upper('%${searchToken}%')`);
+      const bizUrl = `${SCC_BASE_URL}/${BIZ_DATASET}?$where=${whereName}&$limit=15`;
+      const res = await fetch(bizUrl);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          businesses = data;
+        }
       }
     }
 
@@ -111,10 +119,13 @@ export async function querySantaClaraCounty(restaurantName, address = '') {
       return null;
     }
 
-    // Rank candidates
+    // Step 3: Rank candidates with location priority
     const candidates = businesses.map(biz => ({
       biz,
-      score: calculateMatchScore({ name: restaurantName, address }, { name: biz.name, address: `${biz.address || ''} ${biz.city || ''}` })
+      score: calculateMatchScore(
+        { name: restaurantName, address },
+        { name: biz.name, address: `${biz.address || ''} ${biz.city || ''}` }
+      )
     }));
 
     candidates.sort((a, b) => b.score - a.score);
@@ -127,7 +138,10 @@ export async function querySantaClaraCounty(restaurantName, address = '') {
     const matchedBiz = bestMatch.biz;
     const businessId = matchedBiz.business_id;
 
-    // Fetch inspections
+    // Official detail link: https://eservices.sccgov.org/FacilityInspection/Home/ShowDetail/PRxxxxxxx
+    const officialDetailUrl = `https://eservices.sccgov.org/FacilityInspection/Home/ShowDetail/${businessId}`;
+
+    // Step 4: Query inspections for this business_id
     const inspWhere = encodeURIComponent(`business_id='${businessId}'`);
     const inspUrl = `${SCC_BASE_URL}/${INSP_DATASET}?$where=${inspWhere}&$order=date%20DESC&$limit=10`;
     const inspRes = await fetch(inspUrl);
@@ -147,7 +161,8 @@ export async function querySantaClaraCounty(restaurantName, address = '') {
         placard: { label: 'Permitted', color: '#6b7280', icon: 'ℹ️' },
         latestInspection: null,
         history: [],
-        portalUrl: 'https://cpd.sccgov.org/sccdineout-mobile-app'
+        portalUrl: officialDetailUrl,
+        officialDatasetUrl: officialDetailUrl
       };
     }
 
@@ -156,7 +171,7 @@ export async function querySantaClaraCounty(restaurantName, address = '') {
     const scoreNum = latest.score ? Number(latest.score) : null;
     const placard = getSCCPlacardInfo(latest.result, scoreNum);
 
-    // Fetch violations for latest inspection
+    // Step 5: Query violations for latest inspection
     let violations = [];
     if (latestInspId) {
       try {
@@ -216,8 +231,8 @@ export async function querySantaClaraCounty(restaurantName, address = '') {
         }))
       },
       history,
-      portalUrl: 'https://cpd.sccgov.org/sccdineout-mobile-app',
-      officialDatasetUrl: `https://data.sccgov.org/resource/vuw7-jmjk?business_id=${businessId}`
+      portalUrl: officialDetailUrl,
+      officialDatasetUrl: officialDetailUrl
     };
   } catch (error) {
     console.error('DineExpress: SCC Query failed', error);

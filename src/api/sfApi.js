@@ -5,24 +5,18 @@
  * - Historical 2016-2019: pyih-qa8i.json (DataSF)
  */
 
-import { normalizeRestaurantName, calculateMatchScore } from './matching.js';
+import { normalizeRestaurantName, normalizeAddress, calculateMatchScore } from './matching.js';
 
 const SF_BASE_URL = 'https://data.sfgov.org/resource';
 const CURRENT_DATASET = 'tvy3-wexg.json';
 const HISTORICAL_DATASET = 'pyih-qa8i.json';
 
-/**
- * Format SF ISO date string to human readable format
- */
 export function formatSFDate(dateStr) {
   if (!dateStr) return 'N/A';
   const d = new Date(dateStr);
   return isNaN(d.getTime()) ? dateStr : d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-/**
- * Map SF Facility Rating Status to standardized placard
- */
 export function getSFPlacardInfo(statusStr, scoreNum) {
   const s = (statusStr || '').toLowerCase();
   if (s.includes('pass') && !s.includes('conditional')) {
@@ -30,8 +24,8 @@ export function getSFPlacardInfo(statusStr, scoreNum) {
       status: 'Pass',
       badgeClass: 'pass',
       color: '#10b981',
-      icon: '✅',
-      label: 'Pass (Green)',
+      icon: '🟢',
+      label: 'Pass',
       description: 'Satisfactory food safety practices in compliance with SF Public Health Code.'
     };
   } else if (s.includes('conditional') || s.includes('improvement')) {
@@ -39,8 +33,8 @@ export function getSFPlacardInfo(statusStr, scoreNum) {
       status: 'Conditional Pass',
       badgeClass: 'conditional',
       color: '#f59e0b',
-      icon: '⚠️',
-      label: 'Conditional Pass (Yellow)',
+      icon: '🟡',
+      label: 'Conditional Pass',
       description: 'Violations observed requiring corrective action and reinspection.'
     };
   } else if (s.includes('close') || s.includes('closed') || s.includes('red') || s.includes('suspension')) {
@@ -48,17 +42,16 @@ export function getSFPlacardInfo(statusStr, scoreNum) {
       status: 'Closure',
       badgeClass: 'closure',
       color: '#ef4444',
-      icon: '🚫',
-      label: 'Closure / Suspension (Red)',
+      icon: '🔴',
+      label: 'Closure / Suspension',
       description: 'Health permit suspended or closure ordered.'
     };
   }
 
-  // Fallback on score if available
   if (scoreNum !== null && !isNaN(scoreNum)) {
-    if (scoreNum >= 90) return { status: 'Pass', badgeClass: 'pass', color: '#10b981', icon: '✅', label: 'Grade A', description: 'Score >= 90.' };
-    if (scoreNum >= 75) return { status: 'Conditional Pass', badgeClass: 'conditional', color: '#f59e0b', icon: '⚠️', label: 'Grade B', description: 'Score 75-89.' };
-    return { status: 'Major Violations', badgeClass: 'closure', color: '#ef4444', icon: '🚫', label: 'Grade C / Warning', description: 'Score < 75.' };
+    if (scoreNum >= 90) return { status: 'Pass', badgeClass: 'pass', color: '#10b981', icon: '🟢', label: 'Pass', description: 'Score >= 90.' };
+    if (scoreNum >= 75) return { status: 'Conditional Pass', badgeClass: 'conditional', color: '#f59e0b', icon: '🟡', label: 'Needs Improvement', description: 'Score 75-89.' };
+    return { status: 'Major Violations', badgeClass: 'closure', color: '#ef4444', icon: '🔴', label: 'Warning', description: 'Score < 75.' };
   }
 
   return {
@@ -71,32 +64,45 @@ export function getSFPlacardInfo(statusStr, scoreNum) {
   };
 }
 
-/**
- * Query San Francisco County for a restaurant by name and optional address
- * @param {string} restaurantName
- * @param {string} [address='']
- * @returns {Promise<object|null>}
- */
 export async function querySanFranciscoCounty(restaurantName, address = '') {
   try {
     const { primaryName, cleanTokens } = normalizeRestaurantName(restaurantName);
     const searchToken = cleanTokens[0] || primaryName;
-    if (!searchToken) return null;
+    const addrNorm = normalizeAddress(address);
 
-    // Search 2024-Present dataset
-    const whereClause = encodeURIComponent(`upper(dba) like upper('%${searchToken}%')`);
-    const url = `${SF_BASE_URL}/${CURRENT_DATASET}?$where=${whereClause}&$order=inspection_date%20DESC&$limit=20`;
-    
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`SF API returned ${res.status}`);
-    const records = await res.json();
+    let records = [];
 
-    if (!Array.isArray(records) || records.length === 0) {
-      // Try historical dataset fallback
+    // Step 1: Address-First Query in SF
+    if (addrNorm.streetNumber && addrNorm.streetWord) {
+      const whereAddr = encodeURIComponent(`upper(street_address) like upper('%${addrNorm.streetNumber}%${addrNorm.streetWord}%')`);
+      const url = `${SF_BASE_URL}/${CURRENT_DATASET}?$where=${whereAddr}&$order=inspection_date%20DESC&$limit=20`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          records = data;
+        }
+      }
+    }
+
+    // Step 2: Name Query Fallback
+    if (records.length === 0 && searchToken) {
+      const whereClause = encodeURIComponent(`upper(dba) like upper('%${searchToken}%')`);
+      const url = `${SF_BASE_URL}/${CURRENT_DATASET}?$where=${whereClause}&$order=inspection_date%20DESC&$limit=20`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          records = data;
+        }
+      }
+    }
+
+    if (records.length === 0) {
       return await querySFHistorical(restaurantName, address);
     }
 
-    // Group records by DBA / Address to separate multiple locations
+    // Group by location
     const grouped = new Map();
     for (const rec of records) {
       const key = `${rec.dba}_${rec.street_address || ''}`;
@@ -106,7 +112,6 @@ export async function querySanFranciscoCounty(restaurantName, address = '') {
       grouped.get(key).push(rec);
     }
 
-    // Rank grouped locations
     const candidates = [];
     for (const [key, list] of grouped.entries()) {
       const sample = list[0];
@@ -130,7 +135,6 @@ export async function querySanFranciscoCounty(restaurantName, address = '') {
     const violationCount = latest.violation_count ? Number(latest.violation_count) : 0;
     const placard = getSFPlacardInfo(status, null);
 
-    // Parse violation codes text if present
     const rawViolations = latest.violation_codes ? latest.violation_codes.split(', ') : [];
     const violations = rawViolations.map(codeStr => {
       const isCritical = /113952|113953|113996|114259|temperature|hands|vermin|rodent/i.test(codeStr);
@@ -158,6 +162,8 @@ export async function querySanFranciscoCounty(restaurantName, address = '') {
       };
     });
 
+    const officialUrl = `https://data.sfgov.org/Health/Health-Inspection-Scores-2024-Present/g8m3-pdis/data?query=${encodeURIComponent(latest.dba)}`;
+
     return {
       county: 'San Francisco County',
       matched: true,
@@ -180,8 +186,8 @@ export async function querySanFranciscoCounty(restaurantName, address = '') {
         violations: violations
       },
       history,
-      portalUrl: 'https://data.sfgov.org/Health/Health-Inspection-Scores-2024-Present/g8m3-pdis',
-      officialDatasetUrl: `https://data.sfgov.org/Health/Health-Inspection-Scores-2024-Present/g8m3-pdis/data?query=${encodeURIComponent(latest.dba)}`
+      portalUrl: officialUrl,
+      officialDatasetUrl: officialUrl
     };
   } catch (error) {
     console.error('DineExpress: SF Query failed', error);
@@ -189,26 +195,40 @@ export async function querySanFranciscoCounty(restaurantName, address = '') {
   }
 }
 
-/**
- * Historical fallback search on older SF LIVES dataset
- */
 async function querySFHistorical(restaurantName, address) {
   try {
     const { primaryName, cleanTokens } = normalizeRestaurantName(restaurantName);
     const searchToken = cleanTokens[0] || primaryName;
-    if (!searchToken) return null;
+    const addrNorm = normalizeAddress(address);
 
-    const whereClause = encodeURIComponent(`upper(business_name) like upper('%${searchToken}%')`);
-    const url = `${SF_BASE_URL}/${HISTORICAL_DATASET}?$where=${whereClause}&$order=inspection_date%20DESC&$limit=10`;
-    
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const records = await res.json();
-    if (!Array.isArray(records) || records.length === 0) return null;
+    let records = [];
+
+    if (addrNorm.streetNumber && addrNorm.streetWord) {
+      const whereAddr = encodeURIComponent(`upper(business_address) like upper('%${addrNorm.streetNumber}%${addrNorm.streetWord}%')`);
+      const url = `${SF_BASE_URL}/${HISTORICAL_DATASET}?$where=${whereAddr}&$order=inspection_date%20DESC&$limit=10`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) records = data;
+      }
+    }
+
+    if (records.length === 0 && searchToken) {
+      const whereClause = encodeURIComponent(`upper(business_name) like upper('%${searchToken}%')`);
+      const url = `${SF_BASE_URL}/${HISTORICAL_DATASET}?$where=${whereClause}&$order=inspection_date%20DESC&$limit=10`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) records = data;
+      }
+    }
+
+    if (records.length === 0) return null;
 
     const latest = records[0];
     const scoreNum = latest.inspection_score ? Number(latest.inspection_score) : null;
     const placard = getSFPlacardInfo(null, scoreNum);
+    const officialUrl = `https://data.sfgov.org/resource/pyih-qa8i?business_id=${latest.business_id}`;
 
     return {
       county: 'San Francisco County',
@@ -244,8 +264,8 @@ async function querySFHistorical(restaurantName, address) {
         type: r.inspection_type || 'Routine Inspection',
         comment: r.violation_description || ''
       })),
-      portalUrl: 'https://data.sfgov.org/Health/Health-Inspection-Scores-2024-Present/g8m3-pdis',
-      officialDatasetUrl: `https://data.sfgov.org/resource/pyih-qa8i?business_id=${latest.business_id}`
+      portalUrl: officialUrl,
+      officialDatasetUrl: officialUrl
     };
   } catch (err) {
     return null;

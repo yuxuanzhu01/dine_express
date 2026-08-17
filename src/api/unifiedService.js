@@ -1,6 +1,6 @@
 /**
  * DineExpress - Unified Bay Area Food Safety & Inspection Service
- * Coordinates multi-county queries, fuzzy matching, fallback strategies, and official portal deep-linking.
+ * Coordinates multi-county queries, address-first matching, and official portal deep-linking.
  */
 
 import { BAY_AREA_COUNTIES, detectCounty } from './countyInfo.js';
@@ -11,20 +11,20 @@ import { normalizeRestaurantName } from './matching.js';
 
 /**
  * Searches health inspection scores and reports for any Bay Area restaurant
- * @param {string} restaurantName Name of the establishment (e.g. "Master Oh 오선생", "Tartine Bakery")
- * @param {string} [address=''] Full or partial address (e.g. "1484 Halford Ave, Santa Clara, CA 95051")
+ * @param {string} restaurantName Name of the establishment (e.g. "Master Oh 오선생", "Fashion Wok")
+ * @param {string} [address=''] Full or partial address (e.g. "101 S Murphy Ave, Sunnyvale, CA 94086")
  * @param {string} [explicitCountyId=''] Optional manual county override
  * @returns {Promise<object>} Complete health inspection report object
  */
 export async function searchRestaurantHealthReport(restaurantName, address = '', explicitCountyId = '') {
-  if (!restaurantName) {
+  if (!restaurantName && !address) {
     return {
       success: false,
-      error: 'Restaurant name is required'
+      error: 'Restaurant name or address is required'
     };
   }
 
-  // 1. Identify Target County
+  // 1. Identify Target County from Address or Name
   let detectedCounty = explicitCountyId ? Object.values(BAY_AREA_COUNTIES).find(c => c.id === explicitCountyId) : null;
   if (!detectedCounty) {
     detectedCounty = detectCounty(address) || detectCounty(restaurantName);
@@ -32,7 +32,7 @@ export async function searchRestaurantHealthReport(restaurantName, address = '',
 
   const { primaryName } = normalizeRestaurantName(restaurantName);
 
-  // 2. Query County APIs based on detected county
+  // 2. Query County API if county is identified
   let result = null;
 
   if (detectedCounty) {
@@ -43,10 +43,8 @@ export async function searchRestaurantHealthReport(restaurantName, address = '',
     } else if (detectedCounty.id === BAY_AREA_COUNTIES.SONOMA.id) {
       result = await querySonomaCounty(restaurantName, address);
     }
-  }
-
-  // 3. Fallback: If no direct match in detected county (or county is unknown/other Bay Area), try parallel lookups
-  if (!result || !result.matched) {
+  } else {
+    // 3. If county is completely unknown / ambiguous, query live APIs in parallel
     const [sccRes, sfRes, sonomaRes] = await Promise.allSettled([
       querySantaClaraCounty(restaurantName, address),
       querySanFranciscoCounty(restaurantName, address),
@@ -65,7 +63,7 @@ export async function searchRestaurantHealthReport(restaurantName, address = '',
     }
   }
 
-  // 4. If record found in live API, return standard matched report
+  // 4. Return matched record
   if (result && result.matched) {
     return {
       success: true,
@@ -81,13 +79,13 @@ export async function searchRestaurantHealthReport(restaurantName, address = '',
       latestInspection: result.latestInspection,
       history: result.history || [],
       portalUrl: result.portalUrl || (detectedCounty ? detectedCounty.portalUrl : 'https://data.sfgov.org'),
-      officialDatasetUrl: result.officialDatasetUrl,
+      officialDatasetUrl: result.officialDatasetUrl || result.portalUrl,
       queryName: restaurantName,
       queryAddress: address
     };
   }
 
-  // 5. If not found in live API or belongs to non-API county (e.g. San Mateo, Alameda, Contra Costa, Marin, Solano, Napa)
+  // 5. Fallback for unmatched locations or portal-only counties
   const countyObj = detectedCounty || BAY_AREA_COUNTIES.SANTA_CLARA;
   const searchDeepLink = countyObj.searchUrlBuilder(primaryName || restaurantName);
 
@@ -100,7 +98,7 @@ export async function searchRestaurantHealthReport(restaurantName, address = '',
     address: address,
     city: countyObj.cities[0] || 'Bay Area',
     score: null,
-    status: 'Manual Lookup Available',
+    status: 'Lookup Online',
     placard: {
       status: 'Lookup Online',
       badgeClass: 'neutral',
