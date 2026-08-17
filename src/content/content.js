@@ -1,13 +1,16 @@
 /**
- * DineExpress - Google Maps Content Script (Clean Verified Edition)
- * Only injects when an actual, verified official food safety report is matched.
- * Suppresses any badges or placeholders if no official report is found.
+ * DineExpress - Google Maps Content Script (Strict Singleton Edition)
+ * Ensures EXACTLY ONE badge is ever displayed per view.
+ * Eliminates duplicate async injections through debouncing, in-flight locks, and DOM cleanup.
  */
 
 (() => {
-  let currentPlaceId = null;
-  let currentWrapper = null;
+  let inFlightPlaceId = null;
+  let lastInjectedPlaceId = null;
+  let debounceTimer = null;
   let observer = null;
+
+  const BADGE_CONTAINER_ID = 'dine-express-single-badge';
 
   const FOOD_CATEGORY_KEYWORDS = [
     'restaurant', 'cafe', 'café', 'bakery', 'bar', 'pub', 'grill', 'bbq', 'barbecue',
@@ -23,6 +26,13 @@
     'creperie', 'brunch', 'breakfast', 'caterer', 'catering', 'supermarket', 'grocery',
     'food'
   ];
+
+  /**
+   * Remove any and all existing DineExpress badges from the page
+   */
+  function removeAllBadges() {
+    document.querySelectorAll(`.${BADGE_CONTAINER_ID}, #${BADGE_CONTAINER_ID}, .dine-inline-wrapper`).forEach(el => el.remove());
+  }
 
   /**
    * Determine if the place is food / dining related
@@ -129,7 +139,7 @@
   }
 
   /**
-   * Render verified inline badge and details popover
+   * Render single verified inline badge and details popover
    */
   function renderBadge(wrapper, report) {
     const placard = report.placard || { label: 'Pass', badgeClass: 'pass', icon: '🟢' };
@@ -143,7 +153,6 @@
     if (badgeClass === 'conditional') statusIcon = '🟡';
     else if (badgeClass === 'closure') statusIcon = '🔴';
 
-    // Build Detailed Violations HTML
     let violationsHtml = '';
     const viols = report.latestInspection?.violations || [];
     if (viols.length > 0) {
@@ -178,7 +187,6 @@
       `;
     }
 
-    // Build History HTML
     let historyListHtml = '';
     if (report.history && report.history.length > 0) {
       historyListHtml = report.history.slice(0, 5).map(h => `
@@ -271,7 +279,6 @@
       </div>
     `;
 
-    // Toggle Popover
     const trigger = wrapper.querySelector('#dineDetailsToggle');
     const popover = wrapper.querySelector('#dinePopover');
     if (trigger && popover) {
@@ -290,41 +297,42 @@
   }
 
   /**
-   * Check page and only inject if an actual official record is verified
+   * Main inspection logic with strict debounce and singleton enforcement
    */
-  function checkAndInject() {
+  function checkAndInjectNow() {
     const place = extractPlaceInfo();
+
+    // 1. If not on a valid place page, remove all badges and reset
     if (!place) {
-      if (currentWrapper) {
-        currentWrapper.remove();
-        currentWrapper = null;
-      }
-      currentPlaceId = null;
+      removeAllBadges();
+      inFlightPlaceId = null;
+      lastInjectedPlaceId = null;
       return;
     }
 
+    // 2. If not food related, remove all badges and exit
     if (!isFoodRelated(place)) {
-      if (currentWrapper) {
-        currentWrapper.remove();
-        currentWrapper = null;
-      }
-      currentPlaceId = null;
+      removeAllBadges();
+      inFlightPlaceId = null;
+      lastInjectedPlaceId = null;
       return;
     }
 
-    if (place.id === currentPlaceId && currentWrapper && document.body.contains(currentWrapper)) {
+    // 3. If badge is already rendered and valid in DOM for this exact place, do nothing
+    const existingBadge = document.getElementById(BADGE_CONTAINER_ID);
+    if (existingBadge && lastInjectedPlaceId === place.id && document.body.contains(existingBadge)) {
       return;
     }
 
-    currentPlaceId = place.id;
-
-    // Clean up old badge
-    const existing = document.querySelector('.dine-inline-wrapper');
-    if (existing) {
-      existing.remove();
+    // 4. If query for this place is already in-flight, do not send duplicate requests
+    if (inFlightPlaceId === place.id) {
+      return;
     }
 
-    // Query in background FIRST before inserting any DOM elements
+    // Mark query as in-flight
+    inFlightPlaceId = place.id;
+
+    // Send query to background service worker
     chrome.runtime.sendMessage(
       {
         type: 'SEARCH_HEALTH_REPORT',
@@ -335,26 +343,35 @@
         }
       },
       (response) => {
-        // STRICT RULE: If no verified record exists, do NOT show anything!
+        // Reset in-flight lock for this request
+        if (inFlightPlaceId === place.id) {
+          inFlightPlaceId = null;
+        }
+
+        // Verify current place hasn't changed while request was in transit
+        const currentPlace = extractPlaceInfo();
+        if (!currentPlace || currentPlace.id !== place.id) {
+          return;
+        }
+
+        // Strict Check: If no verified record exists, ensure no badges exist
         if (!response || !response.success || !response.data || !response.data.matched || !response.data.latestInspection) {
-          if (currentWrapper) {
-            currentWrapper.remove();
-            currentWrapper = null;
-          }
+          removeAllBadges();
+          lastInjectedPlaceId = null;
           return;
         }
 
-        // Verify place has not changed while network request was pending
-        if (currentPlaceId !== place.id) {
-          return;
-        }
-
+        // Find insertion point
         const anchor = findAnchor();
         if (!anchor || !anchor.parent) {
           return;
         }
 
+        // ABSOLUTE SINGLETON GUARANTEE: Remove any existing badges before creating the single badge
+        removeAllBadges();
+
         const wrapper = document.createElement('div');
+        wrapper.id = BADGE_CONTAINER_ID;
         wrapper.className = 'dine-inline-wrapper';
         wrapper.setAttribute('data-dine-place', place.id);
 
@@ -364,17 +381,27 @@
           anchor.parent.appendChild(wrapper);
         }
 
-        currentWrapper = wrapper;
+        lastInjectedPlaceId = place.id;
         renderBadge(wrapper, response.data);
       }
     );
+  }
+
+  /**
+   * Debounced observer entry point (coalesces burst mutations)
+   */
+  function scheduleCheck() {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+    }
+    debounceTimer = setTimeout(checkAndInjectNow, 200);
   }
 
   function startObserver() {
     if (observer) observer.disconnect();
 
     observer = new MutationObserver(() => {
-      checkAndInject();
+      scheduleCheck();
     });
 
     observer.observe(document.body, {
@@ -382,11 +409,10 @@
       subtree: true
     });
 
-    window.addEventListener('popstate', checkAndInject);
-    window.addEventListener('hashchange', checkAndInject);
+    window.addEventListener('popstate', scheduleCheck);
+    window.addEventListener('hashchange', scheduleCheck);
 
-    setTimeout(checkAndInject, 500);
-    setTimeout(checkAndInject, 1500);
+    setTimeout(scheduleCheck, 400);
   }
 
   if (document.readyState === 'loading') {
