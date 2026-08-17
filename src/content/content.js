@@ -27,13 +27,11 @@
    * Determine if the place is food / dining related
    */
   function isFoodRelated(placeInfo) {
-    // 1. Category check
     const cat = (placeInfo.category || '').toLowerCase();
     if (cat && FOOD_CATEGORY_KEYWORDS.some(kw => cat.includes(kw))) {
       return true;
     }
 
-    // 2. DOM food signals check (Menu tab, Order online button, Dine-in tags)
     const menuTab = document.querySelector('button[aria-label*="Menu"], button[aria-label*="menu"], [data-tab-index="1"]');
     if (menuTab && /menu/i.test(menuTab.textContent || '')) {
       return true;
@@ -52,7 +50,6 @@
       }
     }
 
-    // 3. Name keywords check
     const name = (placeInfo.name || '').toLowerCase();
     if (FOOD_CATEGORY_KEYWORDS.some(kw => name.includes(kw))) {
       return true;
@@ -106,7 +103,6 @@
    * Find injection anchor right under category / rating row in the whitespace
    */
   function findAnchor() {
-    // 1. Right after the category line (e.g. "Chinese restaurant · ♿")
     const catBtn = document.querySelector('button.DkEaL, button[jsaction*="category"], span.YhemCb');
     if (catBtn) {
       const catContainer = catBtn.closest('div.fontBodyMedium, div.SKNSIb, div.m6QErb');
@@ -115,13 +111,11 @@
       }
     }
 
-    // 2. Right above Overview/Menu tab row
     const tabRow = document.querySelector('div.R6Erqc, div[role="tablist"], div.m6QErb.D5K7Pd');
     if (tabRow && tabRow.parentNode) {
       return { parent: tabRow.parentNode, before: tabRow };
     }
 
-    // 3. Below headline container
     const headline = document.querySelector('h1.DUwDvf, div.fontHeadlineLarge');
     if (headline) {
       const topContainer = headline.closest('div.TIHn2, div.m6QErb');
@@ -158,7 +152,6 @@
     const statusLabel = report.status || placard.label || 'Pass';
     const viewUrl = report.officialDatasetUrl || report.portalUrl || report.searchDeepLink || 'https://data.sfgov.org';
 
-    // Status icon
     let statusIcon = '🟢';
     if (badgeClass === 'conditional') statusIcon = '🟡';
     else if (badgeClass === 'closure') statusIcon = '🔴';
@@ -233,6 +226,11 @@
             ${historyListHtml}
           </div>
         ` : ''}
+
+        <!-- Legal Disclaimer & Liability Waiver Note -->
+        <div class="dine-popover-legal">
+          ⚖️ <em>Informational public data aggregate. Official county records govern. Provided AS IS without warranty.</em>
+        </div>
       </div>
     `;
 
@@ -295,14 +293,13 @@
       return;
     }
 
-    // Check if food / restaurant related
     if (!isFoodRelated(place)) {
       if (currentWrapper) {
         currentWrapper.remove();
         currentWrapper = null;
       }
       currentPlaceId = null;
-      return; // DO NOT SHOW FOR NON-RESTAURANTS
+      return;
     }
 
     if (place.id === currentPlaceId && currentWrapper && document.body.contains(currentWrapper)) {
@@ -311,7 +308,6 @@
 
     currentPlaceId = place.id;
 
-    // Clean up old badge
     const existing = document.querySelector('.dine-inline-wrapper');
     if (existing) {
       existing.remove();
