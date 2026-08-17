@@ -19,7 +19,7 @@ export const BAY_AREA_COUNTIES = {
       'cupertino', 'milpitas', 'campbell', 'gilroy', 'los gatos', 'morgan hill',
       'saratoga', 'los altos', 'los altos hills', 'monte sereno', 'stanford', 'alviso'
     ],
-    zipPrefixes: ['950', '951', '94022', '94024', '94040', '94041', '94043', '94301', '94303', '94304', '94305', '94306']
+    zipPrefixes: ['950', '951', '94022', '94024', '94040', '94041', '94043', '94085', '94086', '94087', '94088', '94089', '94301', '94303', '94304', '94305', '94306']
   },
   SAN_FRANCISCO: {
     id: 'san_francisco',
@@ -41,17 +41,17 @@ export const BAY_AREA_COUNTIES = {
     name: 'San Mateo County',
     shortName: 'San Mateo',
     hasDirectApi: false,
-    portalName: 'San Mateo County Environmental Health',
-    portalUrl: 'https://www.smchealth.org/food-program',
-    datasetUrl: 'https://data.smcgov.org/',
-    searchUrlBuilder: (query) => `https://www.google.com/search?q=${encodeURIComponent(query + ' San Mateo County restaurant health inspection score smchealth')}`,
+    portalName: 'San Mateo County Health Inspection Search',
+    portalUrl: 'https://smcehs.my.site.com/s/inspection-report-search?language=en_US',
+    datasetUrl: 'https://www.smchealth.org/food-inspection-results',
+    searchUrlBuilder: (query) => `https://smcehs.my.site.com/s/inspection-report-search?language=en_US`,
     cities: [
       'san mateo', 'redwood city', 'burlingame', 'daly city', 'south san francisco',
       'san bruno', 'menlo park', 'foster city', 'belmont', 'san carlos',
       'millbrae', 'pacifica', 'half moon bay', 'hillsborough', 'atherton',
-      'woodside', 'portola valley', 'brisbane', 'colma', 'east palo alto'
+      'woodside', 'portola valley', 'brisbane', 'colma', 'east palo alto', 'el granada', 'montara', 'moss beach'
     ],
-    zipPrefixes: ['940']
+    zipPrefixes: ['940', '944']
   },
   ALAMEDA: {
     id: 'alameda',
@@ -139,7 +139,7 @@ export const BAY_AREA_COUNTIES = {
     portalName: 'Napa County Environmental Health Food Program',
     portalUrl: 'https://www.countyofnapa.org/1678/Food-Program',
     datasetUrl: 'https://www.countyofnapa.org/',
-    searchUrlBuilder: (query) => `https://www.google.com/search?q=${encodeURIComponent(query + ' Napa County restaurant inspection report')}`,
+    searchUrlBuilder: (query) => `https://www.countyofnapa.org/1678/Food-Program`,
     cities: [
       'napa', 'american canyon', 'st. helena', 'calistoga', 'yountville'
     ],
@@ -156,10 +156,9 @@ export function detectCounty(addressStr) {
   if (!addressStr) return null;
   const lower = addressStr.toLowerCase();
 
-  // 1. Direct city name matching
+  // 1. Direct city name matching (word boundary)
   for (const county of Object.values(BAY_AREA_COUNTIES)) {
     for (const city of county.cities) {
-      // Regex word boundary match for city
       const cityRegex = new RegExp(`\\b${city.replace('.', '\\.')}\\b`, 'i');
       if (cityRegex.test(lower)) {
         return county;

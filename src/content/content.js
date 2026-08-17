@@ -218,14 +218,14 @@
         </span>
 
         <!-- More Details Trigger -->
-        <button class="dine-details-trigger" id="dineDetailsToggle" title="View detailed violations & report">
+        <button class="dine-details-trigger" id="dineDetailsToggle" title="View details & portal link">
           <span>Details</span>
           <span class="dine-chevron">▾</span>
         </button>
 
         <!-- Official Link -->
         <a href="${viewUrl}" target="_blank" rel="noopener noreferrer" class="dine-official-link" title="Open official health records">
-          Official Records ↗
+          ${isMatched ? 'Official Records ↗' : 'Search County Records ↗'}
         </a>
       </div>
 
@@ -238,8 +238,8 @@
               ${escapeHtml(report.businessName || '')} ${report.address ? `• ${escapeHtml(report.address)}` : ''}
             </div>
           </div>
-          <a href="${pdfUrl}" target="_blank" rel="noopener noreferrer" class="dine-pdf-btn" title="View or Print Certified County Inspection Report / PDF">
-            📄 Official PDF ↗
+          <a href="${pdfUrl}" target="_blank" rel="noopener noreferrer" class="dine-pdf-btn" title="Open Official Health Inspection Portal">
+            ${isMatched ? '📄 Official PDF ↗' : '🏛️ Search Portal ↗'}
           </a>
         </div>
 
@@ -260,8 +260,8 @@
               </div>
             ` : ''}
           ` : `
-            <div style="color: #64748b; font-size: 11px;">
-              Inspection records are maintained by the ${escapeHtml(report.countyName)} Environmental Health department.
+            <div style="color: #475569; font-size: 11.5px; line-height: 1.4; background: #f8fafc; padding: 8px 10px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 6px;">
+              <strong>${escapeHtml(report.countyName)}</strong> maintains restaurant inspection records on its official environmental health portal. Click <strong>"Search Portal ↗"</strong> to look up certified inspection reports for this establishment.
             </div>
           `}
 
