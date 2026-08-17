@@ -6,16 +6,13 @@
  * - Violations: wkaa-4ccv
  */
 
-import { normalizeRestaurantName, calculateMatchScore } from './matching.js';
+import { normalizeRestaurantName, normalizeAddress, calculateMatchScore } from './matching.js';
 
 const SCC_BASE_URL = 'https://data.sccgov.org/resource';
 const BIZ_DATASET = 'vuw7-jmjk.json';
 const INSP_DATASET = '2u2d-8jej.json';
 const VIOL_DATASET = 'wkaa-4ccv.json';
 
-/**
- * Format SCC raw date string (e.g., "20260608" or "2025-08-07T00:00:00.000") to human readable format
- */
 export function formatSCCDate(dateStr) {
   if (!dateStr) return 'N/A';
   if (/^\d{8}$/.test(dateStr)) {
@@ -29,9 +26,6 @@ export function formatSCCDate(dateStr) {
   return isNaN(d.getTime()) ? dateStr : d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-/**
- * Map SCC Placard code / score to standardized grade and label
- */
 export function getSCCPlacardInfo(resultCode, scoreNum) {
   const code = (resultCode || '').toUpperCase();
   if (code === 'G') {
@@ -39,8 +33,8 @@ export function getSCCPlacardInfo(resultCode, scoreNum) {
       status: 'Pass',
       badgeClass: 'pass',
       color: '#10b981',
-      icon: '✅',
-      label: 'Pass (Green Placard)',
+      icon: '🟢',
+      label: 'Pass',
       description: 'In compliance with California food safety standards.'
     };
   } else if (code === 'Y') {
@@ -48,8 +42,8 @@ export function getSCCPlacardInfo(resultCode, scoreNum) {
       status: 'Conditional Pass',
       badgeClass: 'conditional',
       color: '#f59e0b',
-      icon: '⚠️',
-      label: 'Conditional Pass (Yellow Placard)',
+      icon: '🟡',
+      label: 'Conditional Pass',
       description: 'Major violations were observed and corrected on-site. Re-inspection required.'
     };
   } else if (code === 'R') {
@@ -57,20 +51,19 @@ export function getSCCPlacardInfo(resultCode, scoreNum) {
       status: 'Closure',
       badgeClass: 'closure',
       color: '#ef4444',
-      icon: '🚫',
-      label: 'Closure / Critical Alert (Red Placard)',
+      icon: '🔴',
+      label: 'Closure / Major Violations',
       description: 'Imminent health hazard observed. Facility was closed or subject to enforcement.'
     };
   }
 
-  // Fallback based on score if code is missing
   if (scoreNum !== null && !isNaN(scoreNum)) {
     if (scoreNum >= 90) {
-      return { status: 'Pass', badgeClass: 'pass', color: '#10b981', icon: '✅', label: 'Pass', description: 'Good compliance score.' };
+      return { status: 'Pass', badgeClass: 'pass', color: '#10b981', icon: '🟢', label: 'Pass', description: 'Good compliance score.' };
     } else if (scoreNum >= 75) {
-      return { status: 'Conditional Pass', badgeClass: 'conditional', color: '#f59e0b', icon: '⚠️', label: 'Needs Improvement', description: 'Moderate violations noted.' };
+      return { status: 'Conditional Pass', badgeClass: 'conditional', color: '#f59e0b', icon: '🟡', label: 'Needs Improvement', description: 'Moderate violations noted.' };
     } else {
-      return { status: 'Major Violations', badgeClass: 'closure', color: '#ef4444', icon: '🚫', label: 'Warning', description: 'Low inspection score.' };
+      return { status: 'Major Violations', badgeClass: 'closure', color: '#ef4444', icon: '🔴', label: 'Warning', description: 'Low inspection score.' };
     }
   }
 
@@ -84,31 +77,41 @@ export function getSCCPlacardInfo(resultCode, scoreNum) {
   };
 }
 
-/**
- * Query Santa Clara County for a restaurant by name and optional address
- * @param {string} restaurantName
- * @param {string} [address='']
- * @returns {Promise<object|null>}
- */
 export async function querySantaClaraCounty(restaurantName, address = '') {
   try {
     const { primaryName, cleanTokens } = normalizeRestaurantName(restaurantName);
     const searchToken = cleanTokens[0] || primaryName;
-    if (!searchToken) return null;
+    const addrNorm = normalizeAddress(address);
 
-    // Search businesses with flexible query
-    const whereClause = encodeURIComponent(`upper(name) like upper('%${searchToken}%')`);
-    const bizUrl = `${SCC_BASE_URL}/${BIZ_DATASET}?$where=${whereClause}&$limit=15`;
-    
-    const bizRes = await fetch(bizUrl);
-    if (!bizRes.ok) throw new Error(`SCC Business API returned ${bizRes.status}`);
-    const businesses = await bizRes.json();
+    let businesses = [];
 
-    if (!Array.isArray(businesses) || businesses.length === 0) {
+    // Pass 1: Search by Name
+    if (searchToken) {
+      const whereClause = encodeURIComponent(`upper(name) like upper('%${searchToken}%')`);
+      const bizUrl = `${SCC_BASE_URL}/${BIZ_DATASET}?$where=${whereClause}&$limit=15`;
+      const res = await fetch(bizUrl);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) businesses = data;
+      }
+    }
+
+    // Pass 2: If no businesses found by name, search by Street Number + Street Word
+    if (businesses.length === 0 && addrNorm.streetNumber && addrNorm.streetWord) {
+      const whereAddr = encodeURIComponent(`upper(address) like upper('%${addrNorm.streetNumber}%${addrNorm.streetWord}%')`);
+      const bizUrl = `${SCC_BASE_URL}/${BIZ_DATASET}?$where=${whereAddr}&$limit=10`;
+      const res = await fetch(bizUrl);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) businesses = data;
+      }
+    }
+
+    if (businesses.length === 0) {
       return null;
     }
 
-    // Rank candidates by fuzzy name & address similarity
+    // Rank candidates
     const candidates = businesses.map(biz => ({
       biz,
       score: calculateMatchScore({ name: restaurantName, address }, { name: biz.name, address: `${biz.address || ''} ${biz.city || ''}` })
@@ -124,7 +127,7 @@ export async function querySantaClaraCounty(restaurantName, address = '') {
     const matchedBiz = bestMatch.biz;
     const businessId = matchedBiz.business_id;
 
-    // Query inspections for this business ordered by date descending
+    // Fetch inspections
     const inspWhere = encodeURIComponent(`business_id='${businessId}'`);
     const inspUrl = `${SCC_BASE_URL}/${INSP_DATASET}?$where=${inspWhere}&$order=date%20DESC&$limit=10`;
     const inspRes = await fetch(inspUrl);
@@ -138,7 +141,6 @@ export async function querySantaClaraCounty(restaurantName, address = '') {
         businessName: matchedBiz.name,
         address: matchedBiz.address,
         city: matchedBiz.city,
-        postalCode: matchedBiz.postal_code,
         score: null,
         status: 'Permitted',
         badgeClass: 'neutral',
@@ -154,7 +156,7 @@ export async function querySantaClaraCounty(restaurantName, address = '') {
     const scoreNum = latest.score ? Number(latest.score) : null;
     const placard = getSCCPlacardInfo(latest.result, scoreNum);
 
-    // Query violations for the latest inspection if available
+    // Fetch violations for latest inspection
     let violations = [];
     if (latestInspId) {
       try {
@@ -170,9 +172,7 @@ export async function querySantaClaraCounty(restaurantName, address = '') {
     }
 
     const criticalViolations = violations.filter(v => v.critical === true || v.critical === 'true');
-    const nonCriticalViolations = violations.filter(v => v.critical !== true && v.critical !== 'true');
 
-    // Build historical records timeline
     const history = inspections.map(insp => {
       const sNum = insp.score ? Number(insp.score) : null;
       const pInfo = getSCCPlacardInfo(insp.result, sNum);

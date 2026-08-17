@@ -14,7 +14,6 @@ export function normalizeRestaurantName(rawName) {
   let name = rawName.trim();
 
   // 1. Remove non-Latin scripts that follow Latin text (e.g. "Master Oh 오선생" -> "Master Oh")
-  // Or if it starts with non-Latin and has Latin, capture both
   const dualScriptMatch = name.match(/^([A-Za-z0-9\s'&.,\-]+)([\u1100-\u11FF\u3130-\u318F\uA960-\uA97F\uAC00-\uD7AF\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF].*)$/);
   if (dualScriptMatch && dualScriptMatch[1].trim().length > 1) {
     name = dualScriptMatch[1].trim();
@@ -30,7 +29,7 @@ export function normalizeRestaurantName(rawName) {
   // 4. Clean special characters but preserve apostrophes and hyphens
   const rawClean = name.replace(/[^\w\s'&]/gi, ' ').replace(/\s+/g, ' ').trim();
 
-  // 5. Build clean comparison tokens (stripping common stopwords like "the", "restaurant", "cafe", "llc", "inc")
+  // 5. Build clean comparison tokens
   const stopWords = new Set(['the', 'and', 'llc', 'inc', 'corp', 'co', 'dba', 'restaurant', 'cafe', 'bistro', 'kitchen', 'express', 'food', 'foods']);
   const tokens = rawClean
     .toLowerCase()
@@ -47,10 +46,10 @@ export function normalizeRestaurantName(rawName) {
 /**
  * Normalizes street address into street number, street name, and city
  * @param {string} rawAddress
- * @returns {{ streetNumber: string, streetName: string, rawClean: string }}
+ * @returns {{ streetNumber: string, streetName: string, streetWord: string, city: string, rawClean: string }}
  */
 export function normalizeAddress(rawAddress) {
-  if (!rawAddress) return { streetNumber: '', streetName: '', rawClean: '' };
+  if (!rawAddress) return { streetNumber: '', streetName: '', streetWord: '', city: '', rawClean: '' };
 
   let clean = rawAddress
     .replace(/,\s*USA$/i, '')
@@ -63,36 +62,36 @@ export function normalizeAddress(rawAddress) {
     .replace(/\s+/g, ' ')
     .trim();
 
+  // Extract street number
   const numMatch = clean.match(/^(\d+)/);
   const streetNumber = numMatch ? numMatch[1] : '';
 
-  // Standardize street suffixes
-  let streetPart = clean
-    .replace(/^\d+\s+/, '')
-    .replace(/\bAvenue\b/i, 'Ave')
-    .replace(/\bBoulevard\b/i, 'Blvd')
-    .replace(/\bStreet\b/i, 'St')
-    .replace(/\bDrive\b/i, 'Dr')
-    .replace(/\bRoad\b/i, 'Rd')
-    .replace(/\bWay\b/i, 'Way')
-    .replace(/\bHighway\b/i, 'Hwy')
-    .replace(/\bParkway\b/i, 'Pkwy')
-    .replace(/\bLane\b/i, 'Ln')
-    .replace(/\bCourt\b/i, 'Ct')
-    .toLowerCase();
+  // Extract address parts separated by commas
+  const parts = clean.split(',').map(p => p.trim());
+  const streetPart = parts[0] ? parts[0].replace(/^\d+\s+/, '') : '';
+  const cityPart = parts[1] || '';
+
+  // Get primary street token (e.g. "Murphy" from "S Murphy Ave", "Guerrero" from "Guerrero St", "Halford" from "Halford Ave")
+  const streetTokens = streetPart
+    .toLowerCase()
+    .replace(/\b(avenue|ave|street|st|boulevard|blvd|drive|dr|road|rd|way|hwy|pkwy|ln|ct|n|s|e|w|north|south|east|west)\b/gi, '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  const streetWord = streetTokens[0] || '';
 
   return {
     streetNumber,
-    streetName: streetPart,
+    streetName: streetPart.toLowerCase(),
+    streetWord,
+    city: cityPart.toLowerCase(),
     rawClean: clean
   };
 }
 
 /**
  * Computes Dice / Bigram coefficient similarity between two strings
- * @param {string} a
- * @param {string} b
- * @returns {number} Score from 0.0 to 1.0
  */
 export function stringSimilarity(a, b) {
   if (!a || !b) return 0;
@@ -126,59 +125,39 @@ export function stringSimilarity(a, b) {
 
 /**
  * Calculates overall match score between target search parameters and candidate record
- * @param {{ name: string, address: string }} target
- * @param {{ name: string, address: string }} candidate
- * @returns {number} Score between 0 and 100
  */
 export function calculateMatchScore(target, candidate) {
-  if (!target.name || !candidate.name) return 0;
+  if (!target.name && !target.address) return 0;
 
-  const targetNameNorm = normalizeRestaurantName(target.name);
-  const candNameNorm = normalizeRestaurantName(candidate.name);
+  let score = 0;
 
-  // 1. Name Dice Similarity (0 - 50 points)
-  const nameSim = stringSimilarity(targetNameNorm.rawClean, candNameNorm.rawClean);
-  let score = nameSim * 50;
-
-  // 2. Token Overlap Bonus (0 - 25 points)
-  if (targetNameNorm.cleanTokens.length > 0 && candNameNorm.cleanTokens.length > 0) {
-    const targetSet = new Set(targetNameNorm.cleanTokens);
-    const candSet = new Set(candNameNorm.cleanTokens);
-    let matchedTokens = 0;
-    for (const t of targetSet) {
-      if (candSet.has(t) || Array.from(candSet).some(c => c.includes(t) || t.includes(c))) {
-        matchedTokens++;
-      }
-    }
-    const tokenScore = (matchedTokens / targetNameNorm.cleanTokens.length) * 25;
-    score += tokenScore;
-  }
-
-  // 3. Exact Substring Match bonus (+15 points)
-  const tLow = targetNameNorm.rawClean.toLowerCase();
-  const cLow = candNameNorm.rawClean.toLowerCase();
-  if (cLow.includes(tLow) || tLow.includes(cLow)) {
-    score += 15;
-  }
-
-  // 4. Address Street Number & Street Name Matching (0 - 35 points)
+  // 1. Address Match Scoring (Highest reliability for physical locations)
   if (target.address && candidate.address) {
     const targetAddr = normalizeAddress(target.address);
     const candAddr = normalizeAddress(candidate.address);
 
     if (targetAddr.streetNumber && candAddr.streetNumber) {
       if (targetAddr.streetNumber === candAddr.streetNumber) {
-        score += 25; // Massive signal for same building number
-      } else {
-        score -= 20; // Penalize different building numbers if present
+        score += 45; // Match on exact building number
+        if (targetAddr.streetWord && candAddr.rawClean.toLowerCase().includes(targetAddr.streetWord)) {
+          score += 35; // Match on street name word
+        }
       }
     }
+  }
 
-    if (targetAddr.streetName && candAddr.streetName) {
-      const addrSim = stringSimilarity(targetAddr.streetName, candAddr.streetName);
-      if (addrSim > 0.6) {
-        score += 10;
-      }
+  // 2. Name Match Scoring
+  if (target.name && candidate.name) {
+    const targetNameNorm = normalizeRestaurantName(target.name);
+    const candNameNorm = normalizeRestaurantName(candidate.name);
+
+    const nameSim = stringSimilarity(targetNameNorm.rawClean, candNameNorm.rawClean);
+    score += nameSim * 30;
+
+    const tLow = targetNameNorm.rawClean.toLowerCase();
+    const cLow = candNameNorm.rawClean.toLowerCase();
+    if (cLow.includes(tLow) || tLow.includes(cLow)) {
+      score += 15;
     }
   }
 
