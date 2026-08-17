@@ -1,0 +1,397 @@
+/* ==========================================================================
+   DineExpress - Google Maps Injected Health Card & Score Badge Styles
+   ========================================================================== */
+
+.dine-express-container {
+  margin: 12px 16px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: #1f2937;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-sizing: border-box;
+}
+
+.dine-express-container * {
+  box-sizing: border-box;
+}
+
+/* Card Root Container */
+.dine-card {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.06), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  position: relative;
+}
+
+/* Card Top Border Accent Bar */
+.dine-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+}
+
+.dine-card.pass::before { background: linear-gradient(90deg, #10b981, #059669); }
+.dine-card.conditional::before { background: linear-gradient(90deg, #f59e0b, #d97706); }
+.dine-card.closure::before { background: linear-gradient(90deg, #ef4444, #dc2626); }
+.dine-card.neutral::before { background: linear-gradient(90deg, #64748b, #475569); }
+
+/* Card Inner Padding */
+.dine-card-inner {
+  padding: 14px 16px;
+}
+
+/* Header Row */
+.dine-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.dine-placard-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.dine-placard-badge.pass {
+  background-color: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.dine-placard-badge.conditional {
+  background-color: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.dine-placard-badge.closure {
+  background-color: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.dine-placard-badge.neutral {
+  background-color: #f1f5f9;
+  color: #334155;
+  border: 1px solid #e2e8f0;
+}
+
+.dine-score-badge {
+  display: flex;
+  align-items: baseline;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+.dine-score-num {
+  font-size: 20px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1;
+}
+
+.dine-score-total {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  margin-left: 2px;
+}
+
+/* County & Date Subheading */
+.dine-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.dine-county-tag {
+  font-weight: 600;
+  color: #4b5563;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dine-date-tag {
+  color: #6b7280;
+}
+
+/* Inspection Details Section */
+.dine-details-section {
+  background: #f9fafb;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border: 1px solid #f3f4f6;
+}
+
+.dine-detail-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.dine-detail-item:last-child {
+  margin-bottom: 0;
+}
+
+.dine-detail-label {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.dine-detail-value {
+  color: #111827;
+  font-weight: 600;
+  text-align: right;
+}
+
+.dine-violations-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.dine-violations-pill.clean {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.dine-violations-pill.has-critical {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.dine-violations-pill.has-minor {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+/* Inspector Comment Snippet */
+.dine-comment-box {
+  font-size: 11px;
+  color: #4b5563;
+  line-height: 1.4;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed #e5e7eb;
+  font-style: italic;
+}
+
+/* Historical Reports Accordion */
+.dine-history-toggle {
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  margin-bottom: 8px;
+}
+
+.dine-history-toggle:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.dine-history-toggle .dine-chevron {
+  transition: transform 0.2s ease;
+}
+
+.dine-history-toggle.open .dine-chevron {
+  transform: rotate(180deg);
+}
+
+.dine-history-drawer {
+  display: none;
+  background: #fafafa;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 12px;
+  border: 1px solid #e5e7eb;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.dine-history-drawer.open {
+  display: block;
+  animation: dineSlideDown 0.2s ease;
+}
+
+@keyframes dineSlideDown {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.dine-history-item {
+  padding: 8px 6px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 11px;
+}
+
+.dine-history-item:last-child {
+  border-bottom: none;
+}
+
+.dine-history-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.dine-history-date {
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.dine-history-result {
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.dine-history-result.pass { background: #d1fae5; color: #065f46; }
+.dine-history-result.conditional { background: #fef3c7; color: #92400e; }
+.dine-history-result.closure { background: #fee2e2; color: #991b1b; }
+.dine-history-result.neutral { background: #f3f4f6; color: #4b5563; }
+
+.dine-history-comment {
+  color: #6b7280;
+  font-size: 11px;
+  margin-top: 2px;
+  line-height: 1.3;
+}
+
+/* Card Actions Footer */
+.dine-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.dine-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1a73e8;
+  text-decoration: none;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.dine-link-btn:hover {
+  background: #e8f0fe;
+  text-decoration: underline;
+}
+
+.dine-refresh-btn {
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.dine-refresh-btn:hover {
+  color: #4b5563;
+  background: #f3f4f6;
+}
+
+/* Loading State */
+.dine-loading-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+}
+
+.dine-spinner {
+  width: 20px;
+  height: 20px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #1a73e8;
+  border-radius: 50%;
+  animation: dineSpin 0.8s linear infinite;
+}
+
+@keyframes dineSpin {
+  to { transform: rotate(360deg); }
+}
+
+.dine-loading-text {
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+/* Floating Quick Badge for Google Maps Canvas */
+.dine-floating-badge {
+  position: absolute;
+  top: 72px;
+  left: 420px;
+  z-index: 999;
+  background: #ffffff;
+  border-radius: 30px;
+  padding: 6px 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border: 1px solid rgba(0,0,0,0.08);
+}
+
+.dine-floating-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.dine-floating-badge.pass { border-left: 4px solid #10b981; }
+.dine-floating-badge.conditional { border-left: 4px solid #f59e0b; }
+.dine-floating-badge.closure { border-left: 4px solid #ef4444; }

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="gradBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#047857" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+  <!-- Background Shield -->
+  <rect x="8" y="8" width="112" height="112" rx="28" fill="url(#gradBg)" filter="url(#shadow)" />
+  
+  <!-- Food Safety Shield / Plate Icon -->
+  <path d="M64 24 C44 24 34 34 34 52 C34 78 64 100 64 100 C64 100 94 78 94 52 C94 34 84 24 64 24 Z" fill="#ffffff" fill-opacity="0.95" />
+  
+  <!-- Checkmark / Inspection Mark -->
+  <path d="M52 58 L61 67 L78 48" fill="none" stroke="#059669" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
+  
+  <!-- Small Star Badge -->
+  <circle cx="88" cy="38" r="10" fill="#f59e0b" />
+  <path d="M88 33 L90 36 L94 37 L91 39 L92 43 L88 41 L84 43 L85 39 L82 37 L86 36 Z" fill="#ffffff" />
+</svg>

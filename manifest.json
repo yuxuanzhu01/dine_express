@@ -1,0 +1,66 @@
+{
+  "manifest_version": 3,
+  "name": "DineExpress - Bay Area Food Safety & Health Scores",
+  "version": "1.0.0",
+  "description": "Displays real-time food safety scores, health inspection reports, and violation histories for Bay Area restaurants on Google Maps.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "DineExpress Food Safety Inspector"
+  },
+  "background": {
+    "service_worker": "src/background/background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.google.com/maps/*",
+        "https://maps.google.com/*"
+      ],
+      "js": [
+        "src/content/content.js"
+      ],
+      "css": [
+        "src/content/content.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://www.google.com/maps/*",
+    "https://maps.google.com/*",
+    "https://data.sfgov.org/*",
+    "https://data.sccgov.org/*",
+    "https://data.sonomacounty.ca.gov/*",
+    "https://api.us.socrata.com/*"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "icons/*.png",
+        "icons/*.svg",
+        "src/content/*.css"
+      ],
+      "matches": [
+        "https://www.google.com/*",
+        "https://maps.google.com/*"
+      ]
+    }
+  ]
+}

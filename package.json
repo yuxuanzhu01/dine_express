@@ -1,0 +1,22 @@
+{
+  "name": "dine_express",
+  "version": "1.0.0",
+  "description": "DineExpress - Bay Area Restaurant Health Inspection Scores & Reports for Google Maps",
+  "main": "src/background/background.js",
+  "type": "module",
+  "scripts": {
+    "test": "node test/test_queries.js",
+    "generate-icons": "node scripts/generate_icons.js"
+  },
+  "keywords": [
+    "chrome-extension",
+    "google-maps",
+    "health-inspection",
+    "bay-area",
+    "food-safety",
+    "sccdineout",
+    "datasf"
+  ],
+  "author": "Yuxuan Zhu",
+  "license": "MIT"
+}

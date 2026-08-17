@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DineExpress - Bay Area Food Safety</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-wrapper">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo-group">
+        <div class="logo-icon">🥗</div>
+        <div>
+          <h1 class="app-title">DineExpress</h1>
+          <p class="app-subtitle">Bay Area Food Safety & Inspection Scores</p>
+        </div>
+      </div>
+      <span class="version-pill">v1.0</span>
+    </header>
+
+    <!-- Search Section -->
+    <section class="search-section">
+      <div class="search-box">
+        <input type="text" id="restaurantInput" class="search-input" placeholder="e.g. Master Oh, Tartine Bakery..." autocomplete="off">
+        <button id="searchBtn" class="search-submit-btn">Search</button>
+      </div>
+
+      <div class="filter-row">
+        <select id="countySelect" class="county-dropdown">
+          <option value="">🗺️ Auto-Detect County</option>
+          <option value="santa_clara">Santa Clara County (San Jose, Mountain View...)</option>
+          <option value="san_francisco">San Francisco County (SF)</option>
+          <option value="san_mateo">San Mateo County (San Mateo, Redwood City...)</option>
+          <option value="alameda">Alameda County (Oakland, Berkeley, Fremont...)</option>
+          <option value="contra_costa">Contra Costa County (Walnut Creek, Concord...)</option>
+          <option value="sonoma">Sonoma County (Santa Rosa, Sonoma...)</option>
+          <option value="marin">Marin County (San Rafael, Novato...)</option>
+          <option value="solano">Solano County (Vallejo, Fairfield...)</option>
+          <option value="napa">Napa County (Napa, St. Helena...)</option>
+        </select>
+      </div>
+    </section>
+
+    <!-- Results Container -->
+    <section id="resultsSection" class="results-section" style="display: none;">
+      <!-- Populated dynamically via popup.js -->
+    </section>
+
+    <!-- Tabs Container -->
+    <nav class="nav-tabs">
+      <button class="nav-tab active" data-tab="coverageTab">County Coverage</button>
+      <button class="nav-tab" data-tab="settingsTab">Settings</button>
+    </nav>
+
+    <!-- Tab 1: Coverage -->
+    <div id="coverageTab" class="tab-content active">
+      <div class="county-grid">
+        <div class="county-card live">
+          <div class="county-card-head">
+            <span class="county-name">Santa Clara County</span>
+            <span class="status-badge live">Live API</span>
+          </div>
+          <p class="county-desc">San Jose, Santa Clara, Sunnyvale, Mountain View, Palo Alto, Cupertino, Milpitas, Campbell</p>
+        </div>
+
+        <div class="county-card live">
+          <div class="county-card-head">
+            <span class="county-name">San Francisco County</span>
+            <span class="status-badge live">Live API</span>
+          </div>
+          <p class="county-desc">San Francisco (DataSF 2024-Present & Historical LIVES Records)</p>
+        </div>
+
+        <div class="county-card live">
+          <div class="county-card-head">
+            <span class="county-name">Sonoma County</span>
+            <span class="status-badge live">Live API</span>
+          </div>
+          <p class="county-desc">Santa Rosa, Petaluma, Sonoma, Healdsburg, Rohnert Park</p>
+        </div>
+
+        <div class="county-card portal">
+          <div class="county-card-head">
+            <span class="county-name">Alameda County</span>
+            <span class="status-badge portal">DEH Portal</span>
+          </div>
+          <p class="county-desc">Oakland, Berkeley, Fremont, Hayward, Alameda, Pleasanton</p>
+        </div>
+
+        <div class="county-card portal">
+          <div class="county-card-head">
+            <span class="county-name">San Mateo County</span>
+            <span class="status-badge portal">DEH Portal</span>
+          </div>
+          <p class="county-desc">San Mateo, Redwood City, Burlingame, Daly City, Foster City</p>
+        </div>
+
+        <div class="county-card portal">
+          <div class="county-card-head">
+            <span class="county-name">Contra Costa County</span>
+            <span class="status-badge portal">CCHealth Portal</span>
+          </div>
+          <p class="county-desc">Walnut Creek, Concord, Richmond, Antioch, San Ramon</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Settings -->
+    <div id="settingsTab" class="tab-content">
+      <div class="setting-item">
+        <div class="setting-info">
+          <div class="setting-title">Cache Storage</div>
+          <div class="setting-desc" id="cacheStatsText">Inspections are cached locally for fast loading.</div>
+        </div>
+        <button id="clearCacheBtn" class="action-btn secondary">Clear Cache</button>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <span>Official Bay Area Open Data & County Public Health Feeds</span>
+    </footer>
+  </div>
+
+  <script src="popup.js" type="module"></script>
+</body>
+</html>
